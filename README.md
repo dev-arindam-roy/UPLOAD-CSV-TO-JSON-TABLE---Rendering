@@ -2,4 +2,252 @@
 
 ### Check The Application
 
-[https://dev-arindam-roy.github.io/Json-To-Csv-Conversion/](https://dev-arindam-roy.github.io/Json-To-Csv-Conversion/)
+[https://dev-arindam-roy.github.io/UPLOAD-CSV-TO-JSON-TABLE---Rendering/](https://dev-arindam-roy.github.io/UPLOAD-CSV-TO-JSON-TABLE---Rendering/)
+
+
+```js
+/** SweetAlert2 loading */
+const displayLoading = (timer = 3000, title = 'Please Wait...', text = "System Processing Your Request") => {
+    Swal.fire({
+        title: title,
+        text: text,
+        allowEscapeKey: false,
+        allowOutsideClick: false,
+        timer: timer,
+        didOpen: () => {
+            Swal.showLoading()
+        }
+    });
+}
+
+/** SweetAlert2 like toast */
+const displayToast = () => {
+    Swal.fire({
+        position: 'top-end',
+        icon: 'success',
+        title: 'Its copied!',
+        showConfirmButton: false,
+        timer: 1000
+    });
+}
+
+$("#frmx").validate({
+    errorClass: 'onex-error',
+    errorElement: 'div',
+    rules: {
+        csv_file: {
+            required: true,
+            extension: 'csv'
+        }
+    },
+    messages: {
+        csv_file: {
+            required: 'Please upload csv file',
+            extension: 'Only accept .csv',
+            accept: 'Only accept .csv'
+        }
+    },
+    errorPlacement: function (error, element) {
+        if(element.hasClass('onex-select2')) {
+            error.insertAfter(element.parent().find('span.select2-container'));
+        } else {
+            error.insertAfter(element);
+        }
+    },
+    highlight: function (element) {
+        $(element).removeClass('is-valid').addClass('is-invalid');
+        $(element).parent().find('.onex-form-label').addClass('onex-error-label');
+        if(element.type == 'select-one') {
+            $(element).next('span.select2-container').addClass('select2-custom-error');
+        }
+    },
+    unhighlight: function (element) {
+        $(element).removeClass('is-invalid').addClass('is-valid');
+        $(element).parent().find('.onex-form-label').removeClass('onex-error-label');
+    },
+    submitHandler: function (form) {
+        uploadCsvFile();
+        return false;
+    }
+});
+
+/* Csv To HTML Table Create */
+const csvTable = (dataArr, renderId, appName = '') => {
+
+    /* create table */
+    let _table = document.createElement('table');
+    _table.setAttribute('id', 'dataTable');
+    _table.classList.add('table', 'table-bordered', 'table-striped', 'table-sm');
+
+    if (dataArr.length) {
+
+        /* remove last array item*/
+        dataArr.splice(-1);
+
+        let headerArr = dataArr[0];
+        let dataLength = parseInt(headerArr.length);
+
+        /* create thead & apped to table */
+        let _thead = document.createElement('thead');
+        _table.appendChild(_thead);
+
+        if (appName !== '') {
+            /* create heading row with colspan td */
+            let _headingTr = _thead.insertRow();
+            let _headingTd = _headingTr.insertCell(0);
+            _headingTd.colSpan = dataLength;
+            _headingTd.innerHTML = `<strong>${appName}</strong> (${dataArr.length - 1})`;
+        }
+
+        dataArr.map((value, index) => {
+
+            if (index === 0) {
+                /* add or insert tr within thead */
+                let _headTr = _thead.insertRow();
+
+                /* dynamically create th & append to above tr*/
+                for (let i = 0; i < dataLength; i++) {
+                    let _headTh = document.createElement('th');
+                    let _headThText = document.createTextNode(`${headerArr[i].charAt(0).toUpperCase()}${headerArr[i].slice(1)}`);
+                    _headTh.appendChild(_headThText);
+                    _headTr.appendChild(_headTh);
+                }   
+            } else {
+                /* create tbody & append to table */
+                let _tbody = document.createElement('tbody');
+                    _table.appendChild(_tbody);
+
+                let _tr = _tbody.insertRow();
+                
+                /* dynamically create td with object value & append to above tr in map loop*/
+                for (let i = 0; i < dataLength; i++) {
+                    let _td = _tr.insertCell(i);
+
+                    /* convert to string and replace doubble quotes*/
+                    let _tdText = document.createTextNode(`${String(value[i]).replace(/^"|"$/g, '')}`);
+                    _td.appendChild(_tdText);
+                }
+            }
+        });
+        /* finally table render to html */
+        document.getElementById(renderId).innerHTML = '';
+        document.getElementById(renderId).appendChild(_table);
+    } else {
+        document.getElementById(renderId).innerHTML = `<h4>No Records Found!</h4>`;
+    }
+}
+
+function actionButtons(jsonObj) {
+    if(jsonObj.length) {
+        $('#downloadJsonBtn').show();
+        $('#downloadCsvBtn').show();
+    } else {
+        $('#downloadJsonBtn').hide();
+        $('#downloadCsvBtn').hide();
+    }
+}
+
+/*Json Content To CSV content*/
+function jsonToCsv(jsonData) {
+    let csv = '';
+    // Get the headers
+    let headers = Object.keys(jsonData[0]);
+    csv += headers.join(',') + '\n';
+    // Add the data
+    jsonData.forEach(function (row) {
+        let data = headers.map(header => row[header]).join(',');
+        csv += data + '\n';
+    });
+    return csv;
+}
+
+let csvFile = document.querySelector('#csvFileUpload');
+
+/*Get Json File Content From Uploader*/
+async function uploadCsvFile() {
+    displayLoading();
+    let file = csvFile.files[0];
+    renderAsJson(file);
+    renderAsTable(file);
+}
+
+async function renderAsTable(file) {
+    let reader = new FileReader(file);
+    reader.readAsText(file);
+    reader.onload = async(e) => {
+        let data = e.target.result;
+        let resultData = data.split(/\r?\n|\r/).map((e) => {
+            return e.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+        });
+        csvTable(resultData, 'renderTable');
+        document.getElementById('tableCount').innerHTML = `(${resultData.length - 1})`;
+        actionButtons(resultData);
+    }
+}
+
+async function renderAsJson(file) {
+    let reader = new FileReader(file);
+    reader.readAsText(file);
+    reader.onload = async(e) => {
+        let resultData = e.target.result;
+        let jsonContent = csvToJson(resultData);
+        console.log(jsonContent);
+        $('#convertedJson').val(JSON.stringify(jsonContent, null, 4));
+        $('#json-renderer').jsonViewer(jsonContent);
+        document.getElementById('jsonCount').innerHTML = `(${jsonContent.length})`;
+        actionButtons(jsonContent);
+    }
+}
+
+/* convert csv to json */
+function csvToJson(csvText) {
+    let lines = [];
+    const linesArray = csvText.split('\n');
+    
+    // for trimming and deleting extra space 
+    linesArray.forEach((e) => {
+        const row = e.replace(/[\s]+[,]+|[,]+[\s]+/g, ',').trim();
+        lines.push(row);
+    });
+    
+    // for removing empty record
+    lines.splice(lines.length - 1, 1);
+    
+    const result = [];
+    const headers = lines[0].split(",");
+
+    for (let i = 1; i < lines.length; i++) {
+        const obj = {};
+        const currentline = lines[i].split(",");
+        for (let j = 0; j < headers.length; j++) {
+            obj[headers[j]] = currentline[j];
+        }
+        result.push(obj);
+    }
+    //return result; //JavaScript object
+    // return JSON.stringify(result); //JSON
+    return result;
+}
+
+/*Download as JSON*/
+$('#downloadJsonBtn').on('click', function() {
+    const anchor = document.createElement('a');
+    anchor.href = 'data:application/json;charset=utf-8,' + encodeURIComponent($('#convertedJson').val());
+    anchor.download = new Date().toJSON() + '.json' ;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+});
+
+/*Download as CSV*/
+$('#downloadCsvBtn').on('click', function() {
+    let content = jsonToCsv(JSON.parse($('#convertedJson').val()));
+    let blob = new Blob([content], { type: 'text/csv' });
+    let url = window.URL.createObjectURL(blob);
+    let a = document.createElement('a');
+    a.href = url;
+    a.download = new Date().toJSON() + '.csv' ;
+    document.body.appendChild(a);
+    a.click();
+});
+```
